@@ -45,34 +45,37 @@
 
 (defun add-to-system-index (instance doc-root stream release-path systems)
   (declare (ignore instance doc-root))
-  (let ((name (last (pathname-directory release-path))))
+  (let ((name (car (last (pathname-directory release-path)))))
     (dolist (system systems)
       (format stream "~A ~A ~A~{ ~A~}~%"
         name (pathname-name (asdf:system-source-file system)) (asdf:component-name system)
         (asdf:system-depends-on system)))))
 
 (defun create-release-tarball (doc-root release-path)
-  (let* ((name (last (pathname-directory release-path)))
+  (let* ((name (car (last (pathname-directory release-path))))
          (tarball-path (merge-pathnames (make-pathname :name name :type "tgz") doc-root)))
     (uiop:run-program
       (list
         "tar"
         "--exclude-vcs"
-        "-C" (merge-pathnames (make-pathname :directory '(:relative :back)) release-path)
+        "-C" (namestring (merge-pathnames (make-pathname :directory '(:relative :back)) release-path))
         "-czf" (namestring tarball-path)
         name))
     tarball-path))
 
+(defun digest-file (digest path)
+  (ironclad:byte-array-to-hex-string (ironclad:digest-file digest path)))
+
 (defun add-to-release-index (instance doc-root stream release-path systems)
   (with-slots (hostname port) instance
-    (let ((name (last (pathname-directory release-path)))
+    (let ((name (car (last (pathname-directory release-path))))
           (tarball-path (create-release-tarball doc-root release-path)))
       (format stream "~A http://~A:~A/~A ~A ~A ~A ~A~{ ~A~}~%"
         name
         hostname port (file-namestring tarball-path)
         (trivial-file-size:file-size-in-octets tarball-path)
-        (ironclad:digest-file :md5 tarball-path)
-        (ironclad:digest-file :sha1 tarball-path)
+        (digest-file :md5 tarball-path)
+        (digest-file :sha1 tarball-path)
         name
         (mapcar
           (lambda (system)
