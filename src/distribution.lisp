@@ -44,21 +44,22 @@
     (directory (merge-pathnames "*.asd" release-path))))
 
 (defun add-to-system-index (instance doc-root stream release-path systems)
+  (declare (ignore instance doc-root))
   (let ((name (last (pathname-directory release-path))))
     (dolist (system systems)
       (format stream "~A ~A ~A~{ ~A~}~%"
-        name (pathname-file (asdf:system-source-file system)) (component-name system)
-        (system-depends-on system)))))
+        name (pathname-name (asdf:system-source-file system)) (asdf:component-name system)
+        (asdf:system-depends-on system)))))
 
 (defun create-release-tarball (doc-root release-path)
   (let* ((name (last (pathname-directory release-path)))
-         (tarball-path (merge-pathnames (make-pathname :file name :type "tgz") doc-root)))
+         (tarball-path (merge-pathnames (make-pathname :name name :type "tgz") doc-root)))
     (uiop:run-program
       (list
         "tar"
         "--exclude-vcs"
         "-C" (merge-pathnames (make-pathname :directory '(:relative :back)) release-path)
-        "-czf" (coerce tarball-path 'string)
+        "-czf" (namestring tarball-path)
         name))
     tarball-path))
 
@@ -91,7 +92,7 @@
           (add-to-system-index instance doc-root systems-stream release-path systems))))))
 
 (defun start (instance)
-  (with-slots (name hostname port releases server) instance
+  (with-slots (name hostname port releases server version) instance
     (let ((doc-root (merge-pathnames
                       (make-pathname
                         :directory (list :relative (format nil "~A_~A" name version)))
