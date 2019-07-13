@@ -107,4 +107,4 @@
       (hunchentoot:start server))))
 
 (defun stop (instance)
-  (hunchentoot:start (distribution-server instance)))
+  (hunchentoot:stop (distribution-server instance)))
