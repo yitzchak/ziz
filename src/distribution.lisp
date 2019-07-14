@@ -36,20 +36,23 @@
       (format stream "release-index-url: http://~A:~A/releases.txt~%" hostname port)
       (format stream "system-index-url: http://~A:~A/systems.txt~%" hostname port))))
 
-(defun load-systems (release-path)
-  (mapcar
-    (lambda (asd-path)
-      (asdf:load-asd asd-path)
-      (asdf:find-system (pathname-name asd-path) nil))
-    (directory (merge-pathnames "*.asd" release-path))))
+(defun load-asd (asd-path)
+  (with-open-file (stream asd-path)
+    (do ((obj (read stream nil :eof) (read stream nil :eof))
+         results)
+        ((eql obj :eof) results)
+      (when (and (listp obj) (equalp (first obj) 'asdf:defsystem))
+        (push obj results)))))
 
-(defun add-to-system-index (instance doc-root stream release-path systems)
-  (declare (ignore instance doc-root))
-  (let ((name (car (last (pathname-directory release-path)))))
-    (dolist (system systems)
+(defun add-to-system-index (instance doc-root stream name release-path asd-paths)
+  (declare (ignore instance doc-root release-path))
+  (dolist (asd-path asd-paths)
+    (dolist (def (load-asd asd-path))
       (format stream "~A ~A ~A~{ ~A~}~%"
-        name (pathname-name (asdf:system-source-file system)) (asdf:component-name system)
-        (asdf:system-depends-on system)))))
+        name
+        (pathname-file asd-path)
+        (asdf:coerce-name (second def))
+        (mapcar #'asdf:coerce-name (getf (cddr def) :depends-on))))))
 
 (defun create-release-tarball (doc-root release-path)
   (let* ((name (car (last (pathname-directory release-path))))
@@ -66,10 +69,9 @@
 (defun digest-file (digest path)
   (ironclad:byte-array-to-hex-string (ironclad:digest-file digest path)))
 
-(defun add-to-release-index (instance doc-root stream release-path systems)
+(defun add-to-release-index (instance doc-root stream name release-path asd-paths)
   (with-slots (hostname port) instance
-    (let ((name (car (last (pathname-directory release-path))))
-          (tarball-path (create-release-tarball doc-root release-path)))
+    (let ((tarball-path (create-release-tarball doc-root release-path)))
       (format stream "~A http://~A:~A/~A ~A ~A ~A ~A~{ ~A~}~%"
         name
         hostname port (file-namestring tarball-path)
@@ -77,10 +79,7 @@
         (digest-file :md5 tarball-path)
         (digest-file :sha1 tarball-path)
         name
-        (mapcar
-          (lambda (system)
-            (file-namestring (asdf:system-source-file system)))
-          systems)))))
+        (mapcar #'file-namestring asd-paths)))))
 
 (defun create-indicies (instance doc-root)
   (with-open-file (releases-stream (merge-pathnames "releases.txt" doc-root)
@@ -90,9 +89,10 @@
       (write-line "# project url size file-md5 content-sha1 prefix [system-file1..system-fileN]" releases-stream)
       (write-line "# project system-file system-name [dependency1..dependencyN]" systems-stream)
       (dolist (release-path (distribution-releases instance))
-        (let ((systems (load-systems release-path)))
-          (add-to-release-index instance doc-root releases-stream release-path systems)
-          (add-to-system-index instance doc-root systems-stream release-path systems))))))
+        (let ((asd-paths (directory (merge-pathnames "*.asd" release-path)))
+              (name (car (last (pathname-directory release-path)))))
+          (add-to-release-index instance doc-root releases-stream name release-path asd-paths)
+          (add-to-system-index instance doc-root systems-stream name release-path asd-paths))))))
 
 (defun start (instance)
   (with-slots (name hostname port releases server version) instance
