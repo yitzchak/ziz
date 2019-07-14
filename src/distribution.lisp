@@ -38,21 +38,28 @@
 
 (defun load-asd (asd-path)
   (with-open-file (stream asd-path)
-    (do ((obj (read stream nil :eof) (read stream nil :eof))
-         results)
-        ((eql obj :eof) results)
-      (when (and (listp obj) (equalp (first obj) 'asdf:defsystem))
-        (push obj results)))))
+    (flet ((my-read (stream)
+             (handler-bind
+               ((error #'continue))
+               (read stream nil :eof))))
+      (do ((obj (my-read stream) (my-read stream))
+           results)
+          ((eql obj :eof) results)
+        (when (and (listp obj)
+                   (equalp (first obj) 'asdf:defsystem))
+          (push obj results))))))
 
 (defun add-to-system-index (instance doc-root stream name release-path asd-paths)
   (declare (ignore instance doc-root release-path))
   (dolist (asd-path asd-paths)
     (dolist (def (load-asd asd-path))
-      (format stream "~A ~A ~A~{ ~A~}~%"
-        name
-        (pathname-file asd-path)
-        (asdf:coerce-name (second def))
-        (mapcar #'asdf:coerce-name (getf (cddr def) :depends-on))))))
+      (destructuring-bind (func system &rest rest &key depends-on &allow-other-keys) def
+        (declare (ignore func rest))
+        (format stream "~A ~A ~A~{ ~A~}~%"
+          name
+          (pathname-name asd-path)
+          (asdf:coerce-name system)
+          (mapcar #'asdf:coerce-name depends-on))))))
 
 (defun create-release-tarball (doc-root release-path)
   (let* ((name (car (last (pathname-directory release-path))))
