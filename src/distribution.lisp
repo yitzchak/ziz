@@ -61,16 +61,39 @@
           (asdf:coerce-name system)
           (mapcar #'asdf:coerce-name depends-on))))))
 
+(defun create-tar (directory)
+  (copy-seq
+    (flexi-streams:with-output-to-sequence (tar-stream :element-type '(unsigned-byte 8))
+      (let ((tar-archive (archive:open-archive 'archive:tar-archive tar-stream :direction :output)))
+        (archive:write-entry-to-archive
+          tar-archive
+          (archive:create-entry-from-pathname
+            tar-archive directory))
+        ; (cl-fad:walk-directory directory
+        ;   (lambda (file-path)
+        ;     (archive:write-entry-to-archive
+        ;       tar-archive
+        ;       (archive:create-entry-from-pathname
+        ;         tar-archive
+        ;         file-path))))
+        (archive:close-archive tar-archive)))))
+
+(defun gzip-data (data output)
+  (with-open-file (ostream output
+                    :element-type '(unsigned-byte 8)
+                    :direction :output
+                    :if-exists :supersede)
+    (salza2:with-compressor (compressor 'salza2:gzip-compressor
+                              :callback (lambda (buffer end)
+                                          (write-sequence buffer ostream :end end)))
+      (salza2:compress-octet-vector data compressor))))
+
 (defun create-release-tarball (doc-root release-path)
   (let* ((name (car (last (pathname-directory release-path))))
          (tarball-path (merge-pathnames (make-pathname :name name :type "tgz") doc-root)))
-    (uiop:run-program
-      (list
-        "tar"
-        "--exclude-vcs"
-        "-C" (namestring (merge-pathnames (make-pathname :directory '(:relative :back)) release-path))
-        "-czf" (namestring tarball-path)
-        name))
+    (gzip-data
+      (create-tar release-path)
+      tarball-path)
     tarball-path))
 
 (defun digest-file (digest path)

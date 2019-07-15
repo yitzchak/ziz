@@ -5,8 +5,12 @@
   :license "MIT"
   :depends-on (
     :alexandria
+    :archive
+    :cl-fad
+    :flexi-streams
     :hunchentoot
     :ironclad
+    :salza2
     :trivial-file-size)
   :components
     ((:module src
