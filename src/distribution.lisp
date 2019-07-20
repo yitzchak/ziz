@@ -17,24 +17,53 @@
      :initarg :port
      :initform 8000
      :accessor distribution-port)
+   (release-index
+     :initarg :release-index
+     :initform "releases.txt"
+     :accessor distribution-release-index)
    (releases
      :initarg :releases
      :initform nil
      :accessor distribution-releases)
    (server
      :initform nil
-     :accessor distribution-server)))
+     :accessor distribution-server)
+   (info
+     :initarg :info
+     :initform "distinfo.txt"
+     :accessor distribution-info)
+   (system-index
+     :initarg :system-index
+     :initform "systems.txt"
+     :accessor distribution-system-index)))
+
+(defun external-url (instance &optional file)
+  (format nil "http://~A:~A/~@[~A~]" (distribution-hostname instance)
+                                     (distribution-port instance)
+                                     file))
+
+(defun distribution-info-url (instance)
+  (external-url instance (distribution-info instance)))
+
+(defun distribution-archive-base-url (instance)
+  (external-url instance))
+
+(defun distribution-release-index-url (instance)
+  (external-url instance (distribution-release-index instance)))
+
+(defun distribution-system-index-url (instance)
+  (external-url instance (distribution-system-index instance)))
 
 (defun create-distinfo (instance doc-root)
-  (with-slots (name version hostname port) instance
-    (with-open-file (stream (merge-pathnames "distinfo.txt" doc-root)
+  (with-slots (name version) instance
+    (with-open-file (stream (merge-pathnames (distribution-info instance) doc-root)
                             :direction :output :if-exists :supersede)
       (format stream "name: ~A~%version: ~A~%" name version)
-      (format stream "archive-base-url: http://~A:~A/~%" hostname port)
-      (format stream "canonical-distinfo-url: http://~A:~A/distinfo.txt~%" hostname port)
-      (format stream "distinfo-subscription-url: http://~A:~A/distinfo.txt~%" hostname port)
-      (format stream "release-index-url: http://~A:~A/releases.txt~%" hostname port)
-      (format stream "system-index-url: http://~A:~A/systems.txt~%" hostname port))))
+      (format stream "archive-base-url: ~A~%" (distribution-archive-base-url instance))
+      (format stream "canonical-distinfo-url: ~A~%" (distribution-info-url instance))
+      (format stream "distinfo-subscription-url: ~A~%" (distribution-info-url instance))
+      (format stream "release-index-url: ~A~%" (distribution-release-index-url instance))
+      (format stream "system-index-url: ~A~%" (distribution-system-index-url instance)))))
 
 (defun load-asd (asd-path)
   (with-open-file (stream asd-path)
@@ -89,9 +118,9 @@
         (mapcar #'file-namestring asd-paths)))))
 
 (defun create-indicies (instance doc-root)
-  (with-open-file (releases-stream (merge-pathnames "releases.txt" doc-root)
+  (with-open-file (releases-stream (merge-pathnames (distribution-release-index instance) doc-root)
                     :direction :output :if-exists :supersede)
-    (with-open-file (systems-stream (merge-pathnames "systems.txt" doc-root)
+    (with-open-file (systems-stream (merge-pathnames (distribution-system-index instance) doc-root)
                       :direction :output :if-exists :supersede)
       (write-line "# project url size file-md5 content-sha1 prefix [system-file1..system-fileN]" releases-stream)
       (write-line "# project system-file system-name [dependency1..dependencyN]" systems-stream)
@@ -115,3 +144,11 @@
 
 (defun stop (instance)
   (hunchentoot:stop (distribution-server instance)))
+
+(defmacro with-distribution ((var &rest rest) &body body)
+  `(let ((,var (apply #'make-instance 'ziz:distribution ,rest)))
+     (unwind-protect
+       (progn
+         (ziz:start ,var)
+         ,@body)
+       (ziz:stop ,var))))
