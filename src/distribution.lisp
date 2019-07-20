@@ -124,14 +124,14 @@
                       :direction :output :if-exists :supersede)
       (write-line "# project url size file-md5 content-sha1 prefix [system-file1..system-fileN]" releases-stream)
       (write-line "# project system-file system-name [dependency1..dependencyN]" systems-stream)
-      (dolist (release-path (distribution-releases instance))
+      (dolist (release-path (mapcar #'truename (distribution-releases instance)))
         (let ((asd-paths (directory (merge-pathnames "*.asd" release-path)))
               (name (car (last (pathname-directory release-path)))))
           (add-to-release-index instance doc-root releases-stream name release-path asd-paths)
           (add-to-system-index instance doc-root systems-stream name release-path asd-paths))))))
 
 (defun start (instance)
-  (with-slots (name hostname port releases server version) instance
+  (with-slots (name hostname port server version) instance
     (let ((doc-root (merge-pathnames
                       (make-pathname
                         :directory (list :relative (format nil "~A_~A" name version)))
