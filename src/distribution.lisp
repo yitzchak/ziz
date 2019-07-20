@@ -146,7 +146,7 @@
   (hunchentoot:stop (distribution-server instance)))
 
 (defmacro with-distribution ((var &rest rest) &body body)
-  `(let ((,var (apply #'make-instance 'ziz:distribution ,rest)))
+  `(let ((,var (make-instance 'ziz:distribution ,@rest)))
      (unwind-protect
        (progn
          (ziz:start ,var)
