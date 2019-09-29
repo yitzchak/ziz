@@ -1,5 +1,5 @@
 (asdf:defsystem #:ziz
-  :description "An on-the-fly Quicklisp Distribution."
+  :description "An ad hoc Quicklisp distribution."
   :version "0.1"
   :author "Tarn W. Burton"
   :license "MIT"
