@@ -15,7 +15,7 @@ the search path.
 ```common-lisp
 (ql:quickload :ziz)
 
-(ziz:with-distribution (dist :releases '("wibble"))
+(ziz:with-distribution (dist :releases '("wibble/"))
   (ql-dist:install-dist (ziz:distribution-info-url dist) :prompt nil)
   (ql:quickload :wibble))
 ```
