@@ -17,7 +17,7 @@ the search path.
 
 (ziz:with-distribution (dist :releases '("wibble"))
   (ql-dist:install-dist (ziz:distribution-info-url dist) :prompt nil)
-  (ql:quickload :wible))
+  (ql:quickload :wibble))
 ```
 
 
